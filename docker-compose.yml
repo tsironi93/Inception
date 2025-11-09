@@ -1,19 +1,56 @@
-version: '3.8'
-
 services:
-  ngnx:
+  nginx:
     build: requirements/nginx/.
     container_name: nginx
     ports:
       - "8080:80"
+    restart: on-failure
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      SSL_CERTIFICATE_FILE: /run/secrets/ssl_certificate
+      SSL_PRIVATE_KEY_FILE: /run/secrets/ssl_private_key
     volumes:
       - ./web:/var/www/html
+      - ./requirements/nginx/conf:/etc/nginx/conf.d
+    depends_on:
+      - wordpress
+    env_file:
+      - ./.env
+    networks:
+      - inception
+
   wordpress:
-    build:
-        requirements/wordpress/.
+    build: requirements/wordpress/.
     container_name: wp-php
     volumes:
       - ./web:/var/www/html
+    env_file:
+      - ./.env
+    depends_on:
+      - mariadb
+    networks:
+      - inception
+    expose:
+      - "9000"
+
   mariadb:
     build: requirements/mariadb/.
     container_name: mariadb
+    restart:
+      unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${ROOT_PASS}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - inception
+
+volumes:
+  db-data:
+
+networks:
+  inception:
+    driver: bridge
