@@ -3,34 +3,41 @@ ifneq (,$(wildcard .env))
 	export
 endif
 
-DC = docker-compose -p inception
-COMPOSE_FILE = docker-compose.yml
+DOCKER_COMPOSE := $(shell if command -v docker-compose >/dev/null 2>&1; then echo docker-compose; \
+	else if docker compose version >/dev/null 2>&1; then echo "docker compose"; \
+	else echo ""; fi; fi)
+
+ifeq ($(DOCKER_COMPOSE),)
+$(error "Neither 'docker-compose' nor 'docker compose' command found. Please install Docker Compose.")
+endif
+
+PROJECT_NAME := inception
+COMPOSE_FILE := docker-compose.yml
 
 .DEFAULT_GOAL := help
 
 build:
 	@echo "Building Docker images..."
-	$(DC) -f $(COMPOSE_FILE) build
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) build
 
 up: build
 	@echo "Starting stack..."
-	$(DC) -f $(COMPOSE_FILE) up -d
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) up -d
 
 down:
-	$(DC) -f $(COMPOSE_FILE) down
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) down
 
 stop:
-	$(DC) -f $(COMPOSE_FILE) stop
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) stop
 
 logs:
-	$(DC) -f $(COMPOSE_FILE) logs -f
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) logs -f
 
-# See running containers
 ps:
-	$(DC) -f $(COMPOSE_FILE) ps
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) ps
 
 clean:
-	$(DC) -f $(COMPOSE_FILE) down -v --remove-orphans
+	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) down -v --remove-orphans
 
 fclean: clean
 	@echo "Removing images..."
@@ -51,3 +58,4 @@ help:
 	@echo "  make fclean       Clean + remove all images"
 	@echo "  make rebuild      Full rebuild"
 	@echo ""
+
