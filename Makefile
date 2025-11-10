@@ -1,61 +1,53 @@
-# Load environment variables from .env if exists
 ifneq (,$(wildcard .env))
-    include .env
-    export
+	include .env
+	export
 endif
 
-# Docker Compose
-DC=docker-compose
-PROJECT_NAME=inception
+DC = docker-compose -p inception
+COMPOSE_FILE = docker-compose.yml
 
-# Default target
 .DEFAULT_GOAL := help
 
-## Build containers
 build:
-	@echo "Building all containers..."
-	$(DC) -p $(PROJECT_NAME) build
+	@echo "Building Docker images..."
+	$(DC) -f $(COMPOSE_FILE) build
 
-## Start containers (detached)
-up:
-	@echo "Starting all containers..."
-	$(DC) -p $(PROJECT_NAME) up -d
+up: build
+	@echo "Starting stack..."
+	$(DC) -f $(COMPOSE_FILE) up -d
 
-## Start containers (attached)
-up-attach:
-	@echo "Starting all containers (attached)..."
-	$(DC) -p $(PROJECT_NAME) up
+down:
+	$(DC) -f $(COMPOSE_FILE) down
 
-## Stop containers
 stop:
-	@echo "Stopping all containers..."
-	$(DC) -p $(PROJECT_NAME) down
+	$(DC) -f $(COMPOSE_FILE) stop
 
-## Restart containers
-restart: stop up
-	@echo "Containers restarted."
-
-## Tail logs
 logs:
-	$(DC) -p $(PROJECT_NAME) logs -f
+	$(DC) -f $(COMPOSE_FILE) logs -f
 
-## Clean volumes (DANGEROUS: destroys DB)
+# See running containers
+ps:
+	$(DC) -f $(COMPOSE_FILE) ps
+
 clean:
-	@echo "Stopping containers and removing volumes..."
-	$(DC) -p $(PROJECT_NAME) down -v
-	@echo "Cleaned up."
+	$(DC) -f $(COMPOSE_FILE) down -v --remove-orphans
 
-## Rebuild everything from scratch
-rebuild: clean build up
+fclean: clean
+	@echo "Removing images..."
+	docker image prune -a -f
 
-## Show help
+rebuild: clean up
+
 help:
-	@echo "Makefile commands:"
-	@echo "  make build        Build all containers"
-	@echo "  make up           Start all containers detached"
-	@echo "  make up-attach    Start all containers attached"
-	@echo "  make stop         Stop all containers"
-	@echo "  make restart      Restart containers"
-	@echo "  make logs         Tail logs for all containers"
-	@echo "  make clean        Stop containers and remove volumes"
-	@echo "  make rebuild      Rebuild everything from scratch"
+	@echo ""
+	@echo "Available Make commands:"
+	@echo "  make build        Build all images"
+	@echo "  make up           Start containers"
+	@echo "  make down         Stop and remove containers"
+	@echo "  make stop         Stop containers (keep volumes)"
+	@echo "  make ps           Show container status"
+	@echo "  make logs         Show logs"
+	@echo "  make clean        Remove containers + volumes"
+	@echo "  make fclean       Clean + remove all images"
+	@echo "  make rebuild      Full rebuild"
+	@echo ""

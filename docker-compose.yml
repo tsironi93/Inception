@@ -1,17 +1,19 @@
 services:
   nginx:
-    build: requirements/nginx/.
+    build: ./src/nginx
+    image: nginx
     container_name: nginx
+    restart: unless-stopped
     ports:
-      - "8080:80"
-    restart: on-failure
+      - "443:443"
     environment:
       MARIADB_DATABASE: ${DB_NAME}
-      SSL_CERTIFICATE_FILE: /run/secrets/ssl_certificate
-      SSL_PRIVATE_KEY_FILE: /run/secrets/ssl_private_key
     volumes:
-      - ./web:/var/www/html
-      - ./requirements/nginx/conf:/etc/nginx/conf.d
+      - ${WP_HOST_DATA}:/var/www/html:ro
+      - ./src/nginx/conf/default.conf:/etc/nginx/conf.d/default.conf:ro
+    secrets:
+      - tls_cert
+      - tls_key
     depends_on:
       - wordpress
     env_file:
@@ -20,12 +22,26 @@ services:
       - inception
 
   wordpress:
-    build: requirements/wordpress/.
-    container_name: wp-php
+    build: ./src/wordpress
+    image: wordpress
+    container_name: wordpress
+    restart: unless-stopped
     volumes:
-      - ./web:/var/www/html
+      - ${WP_HOST_DATA}:/var/www/html
     env_file:
       - ./.env
+    environment:
+      WORDPRESS_DB_HOST: mariadb:3306
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/db_user_password
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_SITE_URL: ${SITE_URL}
+      WORDPRESS_ADMIN_USER: ${WP_ADMIN_USER}
+      WORDPRESS_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+      WORDPRESS_TITLE: ${WP_TITLE}
+    secrets:
+      - db_user_password
     depends_on:
       - mariadb
     networks:
@@ -34,23 +50,35 @@ services:
       - "9000"
 
   mariadb:
-    build: requirements/mariadb/.
+    build: ./src/mariadb
+    image: mariadb
     container_name: mariadb
     restart:
       unless-stopped
+    env_file: ./.env
     environment:
-      MARIADB_ROOT_PASSWORD: ${ROOT_PASS}
-      MARIADB_DATABASE: ${DB_NAME}
-      MARIADB_USER: ${DB_USER}
-      MARIADB_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD_FILE: /run/secrets/db_user_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets:
+      - db_root_password
+      - db_user_password
     volumes:
-      - db-data:/var/lib/mysql
+      - ${DB_HOST_DATA}:/var/lib/mysql
     networks:
       - inception
-
-volumes:
-  db-data:
 
 networks:
   inception:
     driver: bridge
+
+secrets:
+  db_root_password:
+    file: ./secrets/db_root_pass.txt
+  db_user_password:
+    file: ./secrets/db_user_pass.txt
+  tls_cert:
+    file: ./secrets/tls.crt
+  tls_key:
+    file: ./secrets/tls.key
