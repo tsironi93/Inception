@@ -1,13 +1,13 @@
 FROM debian:12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-	nginx \
-	ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
+  nginx \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /etc/nginx/ssl
 
-EXPOSE 433
+EXPOSE 443
 
 STOPSIGNAL SIGTERM
 
