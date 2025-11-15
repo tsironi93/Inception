@@ -7,55 +7,65 @@ SOCKET="/var/run/mysqld/mysqld.sock"
 chown -R mysql:mysql "${DATADIR}"
 
 
-if [-d ${DATADIR}/${DB_HOST_DATA} ]; then
-	echo "DB initialized."
+# if /var/lib/mysql/mysql directory does not exist, this is the first run
+if [ -d ${DATADIR}/${MARIADB_DATABASE} ]; then
+    echo "Not the first run. Skipping initialization of MariaDB database."
 else
-	mariadb-instal-db --user=mysql --datadir="${DATADIR}"
-	service mariadb start
+    echo "First run detected. Initializing MariaDB database."
+    echo "Running mariadb-install-db to initialize the MariaDB data directory (${DATADIR}) and create the system tables"
+    mariadb-install-db --user=mysql --datadir="${DATADIR}"
+    echo "Starting mariadb service"
+    service mariadb start
 
-	DB_ROOT_PASS="$(cat /run/secrets/db_root_password)"
-	DB_USER_PASS="$(cat /run/secrets/db_user_password)"
+    MARIADB_ROOT_PASSWORD=$(cat ${MARIADB_ROOT_PASSWORD_FILE})
+    MARIADB_PASSWORD=$(cat ${MARIADB_PASSWORD_FILE})
 
-
-	# wait for the socket to be ready
-	for i in {1..30}; do
-		if mysqladmin --socket="$SOCKET" ping >/dev/null 2>&1; then
-			break
-		fi
-		sleep 1
-	done
-
-
-
-: "${MYSQL_DATABASE:=wordpress}"
-: "${MYSQL_USER:=wpuser}"
-
-# Initialize database if empty
-if [ ! -d "$DATADIR/mysql" ]; then
-  echo "[mariadb-entrypoint] First run: initializing MariaDB data directory..."
-  mysql_install_db --user=mysql --datadir="$DATADIR"
-
-  mysqld_safe --skip-networking &
-  MYSQ_PID=$!
-
-  # wait for the socket to be ready
-  for i in {1..30}; do
-    if mysqladmin --socket="$SOCKET" ping >/dev/null 2>&1; then
-      break
+    if [ -z "${MARIADB_ROOT_PASSWORD}" ] || [ -z "${MARIADB_DATABASE}" ] || [ -z "${MARIADB_USER}" ] || [ -z "${MARIADB_PASSWORD}" ]; then
+        echo >&2 'Required environment variables are missing.'
+        exit 1
     fi
-    sleep 1
-  done
 
-  mysql --socket="$SOCKET" <<SQL
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASS}';
-CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${DB_USER_PASS}';
-GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
-FLUSH PRIVILEGES;
-SQL
+    # Wait for the server to be ready
+    for i in {30..0}; do
+        if mariadb-admin ping &> /dev/null; then
+            break
+        fi
+        echo 'MariaDB init process in progress...'
+        sleep 1
+    done
+    if [ "$i" -eq 0 ]; then
+        echo >&2 'MariaDB init process failed.'
+        exit 1
+    fi
 
-  mysqladmin --socket="$SOCKET" -uroot -p"${DB_ROOT_PASS}" shutdown
-  echo "[mariadb-entrypoint] Initialization complete."
+    echo "mariadb service successfully started."
+
+    # Set root password
+    mariadb -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${MARIADB_ROOT_PASSWORD}';"
+
+    # Create the application database if it doesn't exist
+    mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS \`${MARIADB_DATABASE}\`;"
+
+    # Drop anonymous users
+    mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" -e "DELETE FROM mysql.user WHERE user = '';"
+
+    # Create the application user and grant privileges
+    mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" -e "CREATE USER IF NOT EXISTS \`${MARIADB_USER}\`@'%' IDENTIFIED BY '${MARIADB_PASSWORD}';"
+    mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" -e "GRANT ALL PRIVILEGES ON \`${MARIADB_DATABASE}\`.* TO \`${MARIADB_USER}\`@'%';"
+
+    # Apply the changes
+    mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;"
+
+    echo "Shutting down the temporary mariadb server"
+
+    # Shutdown the MariaDB server (CMD will start it again)
+    mariadb-admin -u root -p"${MARIADB_ROOT_PASSWORD}" shutdown
 fi
 
-exec mysqld_safe
+# Create and permission the socket directory for the mysql user
+mkdir -p /run/mysqld
+chown -R mysql:mysql /run/mysqld
+
+# Pass execution to the command specified in the Dockerfile's CMD
+# This allows the MariaDB server to run as the main process (PID 1)
+exec "$@"
