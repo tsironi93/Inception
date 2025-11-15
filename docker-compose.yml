@@ -1,4 +1,54 @@
+name: inception
+
 services:
+  mariadb:
+    build: ./src/mariadb
+    image: mariadb
+    container_name: mariadb
+    restart: on-failure
+    env_file: ./.env
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD_FILE: /run/secrets/db_user_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets:
+      - db_root_password
+      - db_user_password
+    volumes:
+      - wordpress-db:/var/lib/mysql
+    networks:
+      - inception
+
+  wordpress:
+    depends_on:
+      - mariadb
+    build: ./src/wordpress
+    image: wordpress
+    container_name: wordpress
+    restart: on-failure
+    volumes:
+      - wordpress_files:/var/www/html
+    env_file:
+      - ./.env
+    environment:
+      WP_TITLE: ${WP_TITLE}
+      WP_SITE_URL: ${SITE_URL}
+      WP_DB_HOST: mariadb:3306
+
+      WP_DB_NAME: ${DB_NAME}
+      WP_DB_USER: ${DB_USER}
+      WP_DB_PASSWORD_FILE: /run/secrets/db_user_password
+
+      WP_ADMIN_USER: ${WP_ADMIN_USER}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+    secrets:
+      - db_user_password
+    networks:
+      - inception
+    expose:
+      - "9000"
+
   nginx:
     build: ./src/nginx
     image: nginx
@@ -18,54 +68,6 @@ services:
       - wordpress
     env_file:
       - ./.env
-    networks:
-      - inception
-
-  wordpress:
-    build: ./src/wordpress
-    image: wordpress
-    container_name: wordpress
-    restart: unless-stopped
-    volumes:
-      - wordpress_files:/var/www/html
-    env_file:
-      - ./.env
-    environment:
-      WORDPRESS_DB_HOST: mariadb:3306
-      WORDPRESS_DB_NAME: ${DB_NAME}
-      WORDPRESS_DB_USER: ${DB_USER}
-      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/db_user_password
-      WORDPRESS_TABLE_PREFIX: wp_
-      WORDPRESS_SITE_URL: ${SITE_URL}
-      WORDPRESS_ADMIN_USER: ${WP_ADMIN_USER}
-      WORDPRESS_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
-      WORDPRESS_TITLE: ${WP_TITLE}
-    secrets:
-      - db_user_password
-    depends_on:
-      - mariadb
-    networks:
-      - inception
-    expose:
-      - "9000"
-
-  mariadb:
-    build: ./src/mariadb
-    image: mariadb
-    container_name: mariadb
-    restart:
-      unless-stopped
-    env_file: ./.env
-    environment:
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD_FILE: /run/secrets/db_user_password
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
-    secrets:
-      - db_root_password
-      - db_user_password
-    volumes:
-      - ${DB_HOST_DATA}:/var/lib/mysql
     networks:
       - inception
 
