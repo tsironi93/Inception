@@ -1,21 +1,16 @@
 FROM debian:12-slim
 LABEL maintainer="itsiros"
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
   mariadb-server \
   && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /var/lib/mysql /var/run/mysqld \
-  && chown -R mysql:mysql /var/lib/mysql /var/run/mysqld
+COPY ./50-server.cnf /etc/mysql/mariadb.conf.d/50-custom.cnf
 
 COPY tools/mariadb-entrypoint.sh /usr/local/bin/mariadb-entrypoint.sh
 RUN chmod +x /usr/local/bin/mariadb-entrypoint.sh
 
-VOLUME ["/var/lib/mysql"]
-
 EXPOSE 3306
 
 ENTRYPOINT ["/usr/local/bin/mariadb-entrypoint.sh"]
-CMD ["mysqld"]
+CMD ["mariadb", "--user=$DB_USER", "--datadir=/var/lib/mysql"]

@@ -4,8 +4,9 @@ ifneq (,$(wildcard .env))
 endif
 
 DOCKER_COMPOSE := $(shell if command -v docker-compose >/dev/null 2>&1; then echo docker-compose; \
-	else if docker compose version >/dev/null 2>&1; then echo "docker compose"; \
-	else echo ""; fi; fi)
+else if command -v "docker compose" >/dev/null 2>&1; then echo "docker compose"; \
+else echo ""; fi; fi)
+
 
 ifeq ($(DOCKER_COMPOSE),)
 $(error "Neither 'docker-compose' nor 'docker compose' command found. Please install Docker Compose.")

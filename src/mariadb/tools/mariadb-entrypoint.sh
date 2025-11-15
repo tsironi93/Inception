@@ -1,11 +1,31 @@
 #!/bin/bash
 set -eu
 
-DATADIR=/var/lib/mysql
-SOCKET=/var/run/mysqld/mysqld.sock
+DATADIR="/var/lib/mysql"
+SOCKET="/var/run/mysqld/mysqld.sock"
 
-DB_ROOT_PASS="$(cat /run/secrets/db_root_password)"
-DB_USER_PASS="$(cat /run/secrets/db_user_password)"
+chown -R mysql:mysql "${DATADIR}"
+
+
+if [-d ${DATADIR}/${DB_HOST_DATA} ]; then
+	echo "DB initialized."
+else
+	mariadb-instal-db --user=mysql --datadir="${DATADIR}"
+	service mariadb start
+
+	DB_ROOT_PASS="$(cat /run/secrets/db_root_password)"
+	DB_USER_PASS="$(cat /run/secrets/db_user_password)"
+
+
+	# wait for the socket to be ready
+	for i in {1..30}; do
+		if mysqladmin --socket="$SOCKET" ping >/dev/null 2>&1; then
+			break
+		fi
+		sleep 1
+	done
+
+
 
 : "${MYSQL_DATABASE:=wordpress}"
 : "${MYSQL_USER:=wpuser}"
