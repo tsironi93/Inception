@@ -2,8 +2,7 @@ name: inception
 
 services:
   mariadb:
-    build: ./src/mariadb
-    image: mariadb
+    image: mariadb:10.6
     container_name: mariadb
     restart: on-failure
     env_file: ./.env
@@ -16,7 +15,7 @@ services:
       - db_root_password
       - db_user_password
     volumes:
-      - wordpress-db:/var/lib/mysql
+      - wordpress_data:/var/lib/mysql
     networks:
       - inception
 

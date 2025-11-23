@@ -1,4 +1,4 @@
-FROM debian:12-slim
+FROM debian:buster
 LABEL maintainer="itsiros"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

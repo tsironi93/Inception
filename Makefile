@@ -14,11 +14,12 @@ endif
 PROJECT_NAME := inception
 COMPOSE_FILE := docker-compose.yml
 
-VOLUME_NAMES = wordpress_files wordpress_data
-VOLUMES_LOCATION = ${HOME}/data/
+# Host directories that docker-compose bind-mounts (must match docker-compose.yml driver_opts device)
+VOLUME_NAMES = www db
+VOLUMES_LOCATION = /home/itsiros/inception_data/
 VOLUMES = $(addprefix ${VOLUMES_LOCATION}, ${VOLUME_NAMES})
 
-SECRET_FILES = db_root_password.txt db_password.txt cert.pem key.pem wp_admin_password.txt wp_user_password.txt
+SECRET_FILES = db_root_pass.txt db_user_pass.txt tls.crt tls.key wp_admin_pass.txt wp_user_pass.txt
 SECRETS_PATHS = $(addprefix ./secrets/, ${SECRET_FILES})
 
 .DEFAULT_GOAL := help
@@ -29,7 +30,7 @@ build:
 
 up: build
 	@echo "Starting stack..."
-	$(SECRETS_PATHS) $(VOLUMES) build
+	$(MAKE) $(SECRETS_PATHS) $(VOLUMES)
 	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) -f $(COMPOSE_FILE) up -d
 
 down:
@@ -59,6 +60,12 @@ $(SECRETS_PATHS):
 
 $(VOLUMES):
 	mkdir -p $@
+	@# set ownership: mariadb uses UID 999 for DB dir, www-data uses UID 33 for web files
+	@if echo "$@" | grep -q '/db$$'; then \
+	    sudo chown -R 999:999 $@ || chown -R 999:999 $@ || true; \
+	else \
+	    sudo chown -R 33:33 $@ || chown -R 33:33 $@ || true; \
+	fi
 
 help:
 	@echo ""
@@ -73,4 +80,3 @@ help:
 	@echo "  make fclean       Clean + remove all images"
 	@echo "  make rebuild      Full rebuild"
 	@echo ""
-

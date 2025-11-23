@@ -1,14 +1,30 @@
 #!/bin/bash
-
 set -e
 
-if [ -f /run/secrets/db_user_pass ]; then
-	export DB_PASS="$(cat /run/secrets/db_user_pass)"
+# Read DB secrets (support both _password and _pass legacy names)
+if [ -f /run/secrets/db_user_password ]; then
+    export DB_PASS="$(cat /run/secrets/db_user_password)"
+elif [ -f /run/secrets/db_user_pass ]; then
+    export DB_PASS="$(cat /run/secrets/db_user_pass)"
 fi
 
-if [ -f /run/secrets/db_root_pass ]; then
-	export ROOT_PASS="$(cat /run/secrets/db_root_pass)"
+if [ -f /run/secrets/db_root_password ]; then
+    export ROOT_PASS="$(cat /run/secrets/db_root_password)"
+elif [ -f /run/secrets/db_root_pass ]; then
+    export ROOT_PASS="$(cat /run/secrets/db_root_pass)"
 fi
+
+# Determine DB host and port (accept WP_DB_HOST or DB_HOST)
+DB_HOST_VALUE="${WP_DB_HOST:-${DB_HOST:-mariadb:3306}}"
+DB_HOST_ONLY="${DB_HOST_VALUE%%:*}"
+DB_PORT="${DB_HOST_VALUE##*:}"
+if [ "$DB_PORT" = "$DB_HOST_ONLY" ]; then
+  DB_PORT=3306
+fi
+
+# Accept WP_DB_* env names (compose provides these)
+DB_USER="${WP_DB_USER:-${DB_USER}}"
+DB_NAME="${WP_DB_NAME:-${DB_NAME}}"
 
 echo "[wp-entrypoint] Waiting for MariaDB at ${DB_HOST_ONLY}:${DB_PORT}..."
 i=0
@@ -46,7 +62,7 @@ if [ ! -f /var/www/html/wp-config.php ]; then
     --url="${SITE_URL}" \
     --title="${WP_TITLE:-MySite}" \
     --admin_user="${WP_ADMIN_USER}" \
-    --admin_password="${WP_ADMIN_PASS}" \
+    --admin_password="${WP_ADMIN_PASS:-$(cat /run/secrets/wp_admin_pass.txt 2>/dev/null || echo '')}" \
     --admin_email="${WP_ADMIN_EMAIL}" \
     --skip-email \
     --allow-root
@@ -54,7 +70,7 @@ if [ ! -f /var/www/html/wp-config.php ]; then
   echo "[wp-entrypoint] WordPress installed (admin: ${WP_ADMIN_USER})."
 
   if [ -n "${WP_USER:-}" ]; then
-    ./wp-cli.phar user create "${WP_USER}" "${WP_USER_EMAIL}" --user_pass="${WP_USER_PASS}" --role=subscriber --allow-root || true
+    ./wp-cli.phar user create "${WP_USER}" "${WP_USER_EMAIL}" --user_pass="${WP_USER_PASS:-$(cat /run/secrets/wp_user_pass.txt 2>/dev/null || echo '')}" --role=subscriber --allow-root || true
     echo "[wp-entrypoint] Additional WP user created: ${WP_USER}"
   fi
 
@@ -64,4 +80,4 @@ else
 fi
 
 echo "[wp-entrypoint] Starting php-fpm..."
-exec php-fpm8.1 -F
+exec php-fpm8.2 -F
