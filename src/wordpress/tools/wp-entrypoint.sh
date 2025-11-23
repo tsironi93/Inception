@@ -58,13 +58,13 @@ if [ ! -f /var/www/html/wp-config.php ]; then
     --allow-root
 
   # install
-  ./wp-cli.phar core install \
-    --url="${SITE_URL}" \
-    --title="${WP_TITLE:-MySite}" \
-    --admin_user="${WP_ADMIN_USER}" \
-    --admin_password="${WP_ADMIN_PASS:-$(cat /run/secrets/wp_admin_pass.txt 2>/dev/null || echo '')}" \
-    --admin_email="${WP_ADMIN_EMAIL}" \
-    --skip-email \
+  ./wp-cli.phar config create \
+    --dbname="${DB_NAME}" \
+    --dbuser="${DB_USER}" \
+    --dbpass="${DB_PASS}" \
+    --dbhost="${DB_HOST_ONLY}" \
+    --dbprefix="${TABLE_PREFIX:-wp_}" \
+    --extra-php='define("FORCE_SSL_ADMIN", true); define("FORCE_SSL", true);' \
     --allow-root
 
   echo "[wp-entrypoint] WordPress installed (admin: ${WP_ADMIN_USER})."

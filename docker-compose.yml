@@ -34,13 +34,16 @@ services:
       WP_TITLE: ${WP_TITLE}
       WP_SITE_URL: ${SITE_URL}
       WP_DB_HOST: mariadb:3306
-
       WP_DB_NAME: ${DB_NAME}
       WP_DB_USER: ${DB_USER}
       WP_DB_PASSWORD_FILE: /run/secrets/db_user_password
-
       WP_ADMIN_USER: ${WP_ADMIN_USER}
       WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+      HTTPS: "on"
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/db_user_password
+      WORDPRESS_DB_HOST: mariadb:3306
     secrets:
       - db_user_password
     networks:
@@ -90,10 +93,10 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: /home/itsiros/inception_data/db
+      device: /home/itsiros/data/db
   wordpress_files:
     driver: local
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: /home/itsiros/inception_data/www
+      device: /home/itsiros/data/www

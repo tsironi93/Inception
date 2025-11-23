@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM debian:12-slim
 LABEL maintainer="itsiros"
 
 ENV DEBIAN_FRONTEND=noninteractive
